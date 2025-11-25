@@ -11,6 +11,14 @@
     {
       "name": "EntryAbility_label",
       "value": "番茄时间"
+    },
+    {
+      "name": "reason_internet",
+      "value": "需要访问网络获取数据"
+    },
+    {
+      "name": "reason_network_info",
+      "value": "需要获取网络状态"
     }
   ]
 }

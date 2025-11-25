@@ -55,8 +55,8 @@ interface MockSettingsData {
  * 封装网络请求功能，支持Mock数据
  */
 export class HttpService {
-  private static baseUrl: string = 'http://localhost:8080/api'; // 本地服务器地址
-  private static mockMode: boolean = true; // Mock模式开关
+  private static baseUrl: string = 'https://m1.apifoxmock.com/m1/7461734-7196216-default'; // 本地服务器地址
+  private static mockMode: boolean = false; // Mock模式开关
 
   /**
    * 设置Mock模式

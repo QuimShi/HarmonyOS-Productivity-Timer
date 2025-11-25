@@ -11,6 +11,23 @@
     "installationFree": true,
     "pages": "$profile:main_pages",
     "requestPermissions": [
+      // 修正：权限reason用资源引用、usedScene用复数abilities
+      {
+        "name": "ohos.permission.INTERNET",
+        "reason": "$string:reason_internet",
+        "usedScene": {
+          "abilities": ["EntryAbility"],
+          "when": "always"
+        }
+      },
+      {
+        "name": "ohos.permission.GET_NETWORK_INFO",
+        "reason": "$string:reason_network_info",
+        "usedScene": {
+          "abilities": ["EntryAbility"],
+          "when": "always"
+        }
+      }
     ],
     "abilities": [
       {

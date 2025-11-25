@@ -11,6 +11,14 @@
     {
       "name": "EntryAbility_label",
       "value": "Pomodoro Timer"
+    },
+    {
+      "name": "reason_internet",
+      "value": "Need to access the network to get data"
+    },
+    {
+      "name": "reason_network_info",
+      "value": "Need to get network status"
     }
   ]
 }
