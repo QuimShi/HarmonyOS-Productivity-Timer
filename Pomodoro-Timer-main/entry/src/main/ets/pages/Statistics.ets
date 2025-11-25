@@ -26,7 +26,7 @@ interface FocusHistoryRecord {
 struct Statistics {
   @State statisticsData: StatisticsData[] = [];
   @State totalPomodoros: number = 0;
-  @State totalFocusTime: number = 0;
+  @State totalFocusSeconds: number = 0;
   @State totalTasks: number = 0;
   @State weekData: StatisticsData[] = [];
   private focusHistory: Record<string, FocusHistoryRecord> = {};
@@ -53,15 +53,13 @@ struct Statistics {
         totalPomodoros += task.pomodoros;
       });
 
-      this.totalTasks = tasks.length;
-      this.totalPomodoros = totalPomodoros;
       const focusHistoryStr = await this.preferences.get('focusHistory', '{}');
       this.focusHistory = JSON.parse(focusHistoryStr as string);
-      const totalFocusSeconds = await this.preferences.get('totalFocusSeconds', 0) as number;
-      this.totalFocusTime = Math.floor(totalFocusSeconds / 60); // 转换为分钟
       
       // 生成最近7天的数据
       this.generateWeekStatistics();
+
+      this.updateSummaryStats(tasks);
     } catch (error) {
       console.error('Failed to load statistics:', error);
     }
@@ -111,6 +109,44 @@ struct Statistics {
     if (this.weekData.length === 0) return 1;
     const max = Math.max(...this.weekData.map((d: StatisticsData) => d.pomodoros));
     return max > 0 ? max : 1;
+  }
+
+  /**
+   * 根据 focusHistory 与任务列表更新顶部统计
+   */
+  private updateSummaryStats(tasks: Task[]): void {
+    let focusSecondsFromHistory = 0;
+    const uniqueTaskIds: Set<number> = new Set();
+
+    Object.values(this.focusHistory).forEach((record: FocusHistoryRecord | undefined) => {
+      if (!record) {
+        return;
+      }
+      focusSecondsFromHistory += record.seconds || 0;
+      record.taskIds.forEach((id: number) => uniqueTaskIds.add(id));
+    });
+
+    this.totalFocusSeconds = focusSecondsFromHistory;
+    this.totalPomodoros = tasks.reduce((sum: number, task: Task) => sum + task.pomodoros, 0);
+    this.totalTasks = tasks.length > 0 ? tasks.length : uniqueTaskIds.size;
+  }
+
+  /**
+   * 格式化总专注时间显示
+   */
+  private formatFocusTimeDisplay(seconds: number): string {
+    if (seconds <= 0) {
+      return '0分钟';
+    }
+    if (seconds < 60) {
+      return `${seconds}秒`;
+    }
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (secs === 0) {
+      return `${mins}分钟`;
+    }
+    return `${mins}分${secs}秒`;
   }
 
   /**
@@ -287,8 +323,8 @@ struct Statistics {
         Column() {
           // 统计卡片区域
           Row() {
-            this.StatCard('总番茄数', this.totalPomodoros, '🍅')
-            this.StatCard('总专注时间', `${this.totalFocusTime}分钟`, '⏱️')
+          this.StatCard('总番茄数', this.totalPomodoros, '🍅')
+          this.StatCard('总专注时间', this.formatFocusTimeDisplay(this.totalFocusSeconds), '⏱️')
             this.StatCard('任务总数', this.totalTasks, '📋')
           }
           .width('100%')

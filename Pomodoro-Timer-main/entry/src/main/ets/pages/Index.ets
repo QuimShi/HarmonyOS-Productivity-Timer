@@ -43,9 +43,7 @@ struct Index {
   @State todayDate: string = new Date().toDateString();
   @State refreshFlag: number = 0;
   private focusHistory: Record<string, FocusHistoryRecord> = {};
-  private totalFocusSeconds: number = 0;
-  private sessionAccumulatedSeconds: number = 0;
-  private isRecordingFocus: boolean = false;
+  private currentSessionSeconds: number = 0;
   private timer: number = 0;
   private preferences: dataPreferences.Preferences | null = null;
   // 添加 dialogController
@@ -194,7 +192,6 @@ struct Index {
       this.totalPomodoros = await this.preferences.get('totalPomodoros', 0) as number;
       const focusHistoryStr = await this.preferences.get('focusHistory', '{}');
       this.focusHistory = JSON.parse(focusHistoryStr as string);
-      this.totalFocusSeconds = await this.preferences.get('totalFocusSeconds', 0) as number;
 
       // 初始化今日总番茄数
       this.updateTodayTotal();
@@ -209,25 +206,10 @@ struct Index {
       try {
         await this.preferences.put('tasks', JSON.stringify(this.tasks));
         await this.preferences.put('totalPomodoros', this.totalPomodoros);
-        await this.preferences.put('focusHistory', JSON.stringify(this.focusHistory));
-        await this.preferences.put('totalFocusSeconds', this.totalFocusSeconds);
         await this.preferences.flush();
       } catch (error) {
         console.error('Failed to save data:', error);
       }
-    }
-  }
-
-  private async saveFocusDataOnly() {
-    if (!this.preferences) {
-      return;
-    }
-    try {
-      await this.preferences.put('focusHistory', JSON.stringify(this.focusHistory));
-      await this.preferences.put('totalFocusSeconds', this.totalFocusSeconds);
-      await this.preferences.flush();
-    } catch (error) {
-      console.error('Failed to save focus data:', error);
     }
   }
 
@@ -476,13 +458,12 @@ struct Index {
       clearInterval(this.timer);
       void this.commitFocusTime();
     } else {
-      this.sessionAccumulatedSeconds = 0;
-      this.isRecordingFocus = this.isWorkTime;
+      this.currentSessionSeconds = 0;
       this.timer = setInterval(async () => {
         if (this.remainingTime > 0) {
           this.remainingTime--;
-          if (this.isRecordingFocus && this.isWorkTime) {
-            this.sessionAccumulatedSeconds++;
+          if (this.isWorkTime) {
+            this.currentSessionSeconds++;
           }
         } else {
           await this.completePomodoro();
@@ -496,8 +477,7 @@ struct Index {
     clearInterval(this.timer);
     void this.commitFocusTime();
     this.isRunning = false;
-    this.isRecordingFocus = false;
-    this.sessionAccumulatedSeconds = 0;
+    this.currentSessionSeconds = 0;
     this.remainingTime = this.isWorkTime ? 25 * 60 : 5 * 60;
   }
 
@@ -559,25 +539,40 @@ struct Index {
   }
 
   private async commitFocusTime() {
-    if (!this.isRecordingFocus || this.sessionAccumulatedSeconds <= 0) {
-      this.sessionAccumulatedSeconds = 0;
+    if (this.currentSessionSeconds <= 0 || !this.preferences) {
+      this.currentSessionSeconds = 0;
       return;
     }
+    let latestHistory: Record<string, FocusHistoryRecord> = {};
+    try {
+      const focusHistoryStr = await this.preferences.get('focusHistory', '{}');
+      latestHistory = JSON.parse(focusHistoryStr as string);
+    } catch (error) {
+      console.error('Failed to reload focus history:', error);
+      latestHistory = {};
+    }
+
     const today = new Date().toDateString();
-    if (!this.focusHistory[today]) {
-      this.focusHistory[today] = {
+    if (!latestHistory[today]) {
+      latestHistory[today] = {
         seconds: 0,
         taskIds: []
       };
     }
-    this.focusHistory[today].seconds += this.sessionAccumulatedSeconds;
-    if (this.currentTaskId !== -1 && this.focusHistory[today].taskIds.indexOf(this.currentTaskId) === -1) {
-      this.focusHistory[today].taskIds.push(this.currentTaskId);
+    latestHistory[today].seconds += this.currentSessionSeconds;
+    if (this.currentTaskId !== -1 && latestHistory[today].taskIds.indexOf(this.currentTaskId) === -1) {
+      latestHistory[today].taskIds.push(this.currentTaskId);
     }
-    this.totalFocusSeconds += this.sessionAccumulatedSeconds;
-    this.sessionAccumulatedSeconds = 0;
-    this.isRecordingFocus = false;
-    await this.saveFocusDataOnly();
+
+    try {
+      await this.preferences.put('focusHistory', JSON.stringify(latestHistory));
+      await this.preferences.flush();
+      this.focusHistory = latestHistory;
+    } catch (error) {
+      console.error('Failed to save focus history:', error);
+    } finally {
+      this.currentSessionSeconds = 0;
+    }
   }
 
   private switchMode() {
