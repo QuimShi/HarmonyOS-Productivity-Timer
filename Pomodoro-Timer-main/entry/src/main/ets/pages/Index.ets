@@ -13,6 +13,11 @@ interface Task {
   lastPomodoroDate: string;
 }
 
+interface FocusHistoryRecord {
+  seconds: number;
+  taskIds: number[];
+}
+
 // 添加主题颜色接口
 interface ThemeColors {
   primary: string;
@@ -37,6 +42,10 @@ struct Index {
   @State showAddTask: boolean = false;
   @State todayDate: string = new Date().toDateString();
   @State refreshFlag: number = 0;
+  private focusHistory: Record<string, FocusHistoryRecord> = {};
+  private totalFocusSeconds: number = 0;
+  private sessionAccumulatedSeconds: number = 0;
+  private isRecordingFocus: boolean = false;
   private timer: number = 0;
   private preferences: dataPreferences.Preferences | null = null;
   // 添加 dialogController
@@ -183,6 +192,9 @@ struct Index {
       const tasksStr = await this.preferences.get('tasks', '[]');
       this.tasks = JSON.parse(tasksStr as string);
       this.totalPomodoros = await this.preferences.get('totalPomodoros', 0) as number;
+      const focusHistoryStr = await this.preferences.get('focusHistory', '{}');
+      this.focusHistory = JSON.parse(focusHistoryStr as string);
+      this.totalFocusSeconds = await this.preferences.get('totalFocusSeconds', 0) as number;
 
       // 初始化今日总番茄数
       this.updateTodayTotal();
@@ -197,10 +209,25 @@ struct Index {
       try {
         await this.preferences.put('tasks', JSON.stringify(this.tasks));
         await this.preferences.put('totalPomodoros', this.totalPomodoros);
+        await this.preferences.put('focusHistory', JSON.stringify(this.focusHistory));
+        await this.preferences.put('totalFocusSeconds', this.totalFocusSeconds);
         await this.preferences.flush();
       } catch (error) {
         console.error('Failed to save data:', error);
       }
+    }
+  }
+
+  private async saveFocusDataOnly() {
+    if (!this.preferences) {
+      return;
+    }
+    try {
+      await this.preferences.put('focusHistory', JSON.stringify(this.focusHistory));
+      await this.preferences.put('totalFocusSeconds', this.totalFocusSeconds);
+      await this.preferences.flush();
+    } catch (error) {
+      console.error('Failed to save focus data:', error);
     }
   }
 
@@ -447,10 +474,16 @@ struct Index {
   private toggleTimer() {
     if (this.isRunning) {
       clearInterval(this.timer);
+      void this.commitFocusTime();
     } else {
+      this.sessionAccumulatedSeconds = 0;
+      this.isRecordingFocus = this.isWorkTime;
       this.timer = setInterval(async () => {
         if (this.remainingTime > 0) {
           this.remainingTime--;
+          if (this.isRecordingFocus && this.isWorkTime) {
+            this.sessionAccumulatedSeconds++;
+          }
         } else {
           await this.completePomodoro();
         }
@@ -461,12 +494,16 @@ struct Index {
 
   private resetTimer() {
     clearInterval(this.timer);
+    void this.commitFocusTime();
     this.isRunning = false;
+    this.isRecordingFocus = false;
+    this.sessionAccumulatedSeconds = 0;
     this.remainingTime = this.isWorkTime ? 25 * 60 : 5 * 60;
   }
 
   private async completePomodoro() {
     if (this.isWorkTime) {
+      await this.commitFocusTime();
       this.totalPomodoros++;
 
       if (this.currentTaskId !== -1) {
@@ -521,6 +558,28 @@ struct Index {
     this.todayPomodoros = total;
   }
 
+  private async commitFocusTime() {
+    if (!this.isRecordingFocus || this.sessionAccumulatedSeconds <= 0) {
+      this.sessionAccumulatedSeconds = 0;
+      return;
+    }
+    const today = new Date().toDateString();
+    if (!this.focusHistory[today]) {
+      this.focusHistory[today] = {
+        seconds: 0,
+        taskIds: []
+      };
+    }
+    this.focusHistory[today].seconds += this.sessionAccumulatedSeconds;
+    if (this.currentTaskId !== -1 && this.focusHistory[today].taskIds.indexOf(this.currentTaskId) === -1) {
+      this.focusHistory[today].taskIds.push(this.currentTaskId);
+    }
+    this.totalFocusSeconds += this.sessionAccumulatedSeconds;
+    this.sessionAccumulatedSeconds = 0;
+    this.isRecordingFocus = false;
+    await this.saveFocusDataOnly();
+  }
+
   private switchMode() {
     this.isWorkTime = !this.isWorkTime;
     this.remainingTime = this.isWorkTime ? 25 * 60 : 5 * 60;
@@ -554,6 +613,7 @@ struct Index {
 
   aboutToDisappear() {
     clearInterval(this.timer);
+    void this.commitFocusTime();
     if (this.preferences) {
       this.preferences.flush();
     }

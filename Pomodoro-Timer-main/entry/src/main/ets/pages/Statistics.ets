@@ -12,6 +12,11 @@ interface StatisticsData {
   focusTime: number; // 分钟
 }
 
+interface FocusHistoryRecord {
+  seconds: number;
+  taskIds: number[];
+}
+
 /**
  * 统计页面组件
  * 展示番茄钟使用数据统计，包括图表展示
@@ -24,11 +29,11 @@ struct Statistics {
   @State totalFocusTime: number = 0;
   @State totalTasks: number = 0;
   @State weekData: StatisticsData[] = [];
+  private focusHistory: Record<string, FocusHistoryRecord> = {};
   private preferences: dataPreferences.Preferences | null = null;
 
   async aboutToAppear(): Promise<void> {
     await this.loadStatisticsData();
-    this.calculateWeekData();
   }
 
   /**
@@ -50,10 +55,13 @@ struct Statistics {
 
       this.totalTasks = tasks.length;
       this.totalPomodoros = totalPomodoros;
-      this.totalFocusTime = this.totalPomodoros * 25; // 每个番茄钟25分钟
+      const focusHistoryStr = await this.preferences.get('focusHistory', '{}');
+      this.focusHistory = JSON.parse(focusHistoryStr as string);
+      const totalFocusSeconds = await this.preferences.get('totalFocusSeconds', 0) as number;
+      this.totalFocusTime = Math.floor(totalFocusSeconds / 60); // 转换为分钟
       
       // 生成最近7天的数据
-      this.generateWeekStatistics(tasks);
+      this.generateWeekStatistics();
     } catch (error) {
       console.error('Failed to load statistics:', error);
     }
@@ -62,7 +70,7 @@ struct Statistics {
   /**
    * 生成最近7天的统计数据
    */
-  private generateWeekStatistics(tasks: Task[]): void {
+  private generateWeekStatistics(): void {
     const weekData: StatisticsData[] = [];
     const today = new Date();
     
@@ -70,44 +78,20 @@ struct Statistics {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       const dateStr = date.toDateString();
-      
-      let dayPomodoros = 0;
-      let dayTasks = 0;
-      
-      tasks.forEach((task: Task) => {
-        if (task.lastPomodoroDate === dateStr) {
-          dayPomodoros += task.todayPomodoros;
-          dayTasks++;
-        }
-      });
+
+      const record = this.focusHistory[dateStr];
+      const focusMinutes = record ? Math.floor(record.seconds / 60) : 0;
+      const dayTasks = record ? record.taskIds.length : 0;
       
       weekData.push({
         date: dateStr,
-        pomodoros: dayPomodoros,
+        pomodoros: focusMinutes,
         tasks: dayTasks,
-        focusTime: dayPomodoros * 25
+        focusTime: focusMinutes
       });
     }
     
     this.weekData = weekData;
-  }
-
-  /**
-   * 计算周数据
-   */
-  private calculateWeekData(): void {
-    // 根据最近7天数据重新计算汇总信息，保证顶部统计与图表一致
-    let totalPomodoros: number = 0;
-    let totalTasks: number = 0;
-
-    this.weekData.forEach((item: StatisticsData) => {
-      totalPomodoros += item.pomodoros;
-      totalTasks += item.tasks;
-    });
-
-    this.totalPomodoros = totalPomodoros;
-    this.totalTasks = totalTasks;
-    this.totalFocusTime = this.totalPomodoros * 25; // 每个番茄钟25分钟
   }
 
   /**
@@ -167,7 +151,7 @@ struct Statistics {
   @Builder
   BarChart(): void {
     Column() {
-      Text('最近7天番茄钟统计')
+      Text('最近7天专注时长（分钟）')
         .fontSize(18)
         .fontWeight(FontWeight.Medium)
         .fontColor('#2D3436')
@@ -343,7 +327,7 @@ struct Statistics {
                 Blank()
                 
                 Column() {
-                  Text(`${item.pomodoros} 🍅`)
+                  Text(`${item.pomodoros} 分钟`)
                     .fontSize(16)
                     .fontColor('#FF6B6B')
                     .fontWeight(FontWeight.Medium)

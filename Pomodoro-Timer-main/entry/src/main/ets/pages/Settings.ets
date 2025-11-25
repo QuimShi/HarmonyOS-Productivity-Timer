@@ -210,6 +210,8 @@ struct Settings {
 
       await dataPrefs.put('tasks', JSON.stringify(resetTasks));
       await dataPrefs.put('totalPomodoros', 0);
+      await dataPrefs.put('focusHistory', JSON.stringify({}));
+      await dataPrefs.put('totalFocusSeconds', 0);
       await dataPrefs.flush();
 
       promptAction.showToast({
