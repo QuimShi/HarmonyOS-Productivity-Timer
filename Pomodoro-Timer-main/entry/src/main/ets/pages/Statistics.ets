@@ -41,10 +41,15 @@ struct Statistics {
       
       const tasksStr = await this.preferences.get('tasks', '[]');
       const tasks: Task[] = JSON.parse(tasksStr as string);
-      
-      // 计算统计数据
+
+      // 优先根据任务数据计算统计信息，保证与主界面保持一致
+      let totalPomodoros: number = 0;
+      tasks.forEach((task: Task) => {
+        totalPomodoros += task.pomodoros;
+      });
+
       this.totalTasks = tasks.length;
-      this.totalPomodoros = await this.preferences.get('totalPomodoros', 0) as number;
+      this.totalPomodoros = totalPomodoros;
       this.totalFocusTime = this.totalPomodoros * 25; // 每个番茄钟25分钟
       
       // 生成最近7天的数据
@@ -91,7 +96,18 @@ struct Statistics {
    * 计算周数据
    */
   private calculateWeekData(): void {
-    // 数据已在generateWeekStatistics中计算
+    // 根据最近7天数据重新计算汇总信息，保证顶部统计与图表一致
+    let totalPomodoros: number = 0;
+    let totalTasks: number = 0;
+
+    this.weekData.forEach((item: StatisticsData) => {
+      totalPomodoros += item.pomodoros;
+      totalTasks += item.tasks;
+    });
+
+    this.totalPomodoros = totalPomodoros;
+    this.totalTasks = totalTasks;
+    this.totalFocusTime = this.totalPomodoros * 25; // 每个番茄钟25分钟
   }
 
   /**

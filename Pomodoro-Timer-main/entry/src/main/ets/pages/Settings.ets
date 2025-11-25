@@ -1,5 +1,6 @@
 import { router, promptAction } from '@kit.ArkUI';
 import dataPreferences from '@ohos.data.preferences';
+import { Task } from '../models/TaskModel';
 
 /**
  * 设置项接口
@@ -183,6 +184,47 @@ struct Settings {
       .margin({ bottom: 12 })
   }
 
+  /**
+   * 清空所有统计数据和任务番茄数
+   */
+  private async clearStatistics(): Promise<void> {
+    try {
+      const context = getContext(this);
+      const dataPrefs = await dataPreferences.getPreferences(context, 'PomodoroData');
+
+      const tasksStr = await dataPrefs.get('tasks', '[]');
+      const tasks: Task[] = JSON.parse(tasksStr as string);
+
+      // 将所有任务的番茄数归零
+      const resetTasks: Task[] = [];
+      tasks.forEach((task: Task) => {
+        resetTasks.push({
+          id: task.id,
+          title: task.title,
+          completed: false,
+          pomodoros: 0,
+          todayPomodoros: 0,
+          lastPomodoroDate: new Date().toDateString()
+        });
+      });
+
+      await dataPrefs.put('tasks', JSON.stringify(resetTasks));
+      await dataPrefs.put('totalPomodoros', 0);
+      await dataPrefs.flush();
+
+      promptAction.showToast({
+        message: '统计数据已清空',
+        duration: 2000
+      });
+    } catch (error) {
+      console.error('Failed to clear statistics:', error);
+      promptAction.showToast({
+        message: '清空失败，请稍后重试',
+        duration: 2000
+      });
+    }
+  }
+
   build() {
     Column() {
       // 顶部导航栏
@@ -313,6 +355,11 @@ struct Settings {
             this.autoStartRest = false;
             this.showNotifications = true;
             this.saveSettings();
+          })
+
+          this.ActionButton('清空统计数据', () => {
+            // 一键清空所有任务的番茄记录和总番茄数
+            this.clearStatistics();
           })
         }
         .width('100%')
