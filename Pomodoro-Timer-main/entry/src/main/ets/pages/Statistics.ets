@@ -263,24 +263,37 @@ struct Statistics {
         .width('100%')
         .height(180)
         
-        // 数据点连线（使用视觉元素模拟）
+        // 绘制连接线 - 使用简化的实现
+        ForEach(this.weekData.slice(0, -1), (item: StatisticsData, index: number) => {
+          Line()
+            .startPoint([`${(index + 0.5) * (100 / this.weekData.length)}%`, 180 - item.focusTime])
+            .endPoint([`${(index + 1.5) * (100 / this.weekData.length)}%`, 180 - this.weekData[index + 1].focusTime])
+            .stroke('#FF6B6B')
+            .strokeWidth(2)
+        })
+        
+        // 数据点显示
         Row() {
           ForEach(this.weekData, (item: StatisticsData, index: number) => {
             Column() {
-              // 数据点
-              Circle()
-                .width(12)
-                .height(12)
-                .fill('#FF6B6B')
-                .margin({ bottom: 4 })
+              // 数据点容器，控制垂直位置
+              Stack() {
+                Circle()
+                  .width(12)
+                  .height(12)
+                  .fill('#FF6B6B')
+              }
+              .height(180 - item.focusTime)
+              .alignContent(Alignment.End)
               
+              // 数据标签
               Text(`${item.focusTime}分钟`)
                 .fontSize(10)
                 .fontColor('#636E72')
+                .margin({ top: 4 })
             }
             .width('14%')
             .height(180)
-            .justifyContent(FlexAlign.End)
             .alignItems(HorizontalAlign.Center)
           })
         }
