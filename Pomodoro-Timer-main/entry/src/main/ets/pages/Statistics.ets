@@ -264,27 +264,25 @@ struct Statistics {
         .height(180)
         
         // 绘制连接线 - 使用简化的实现
-        ForEach(this.weekData.slice(0, -1), (item: StatisticsData, index: number) => {
-          Line()
-            .startPoint([`${(index + 0.5) * (100 / this.weekData.length)}%`, 180 - item.focusTime])
-            .endPoint([`${(index + 1.5) * (100 / this.weekData.length)}%`, 180 - this.weekData[index + 1].focusTime])
-            .stroke('#FF6B6B')
-            .strokeWidth(2)
-        })
+        // 暂时移除连接线以避免垂直线问题
+        // ForEach(this.weekData.slice(0, -1), (item: StatisticsData, index: number) => {
+        //   Line()
+        //     .startPoint([`${(index + 0.5) * (100 / this.weekData.length)}%`, 180 - item.focusTime])
+        //     .endPoint([`${(index + 1.5) * (100 / this.weekData.length)}%`, 180 - this.weekData[index + 1].focusTime])
+        //     .stroke('#FF6B6B')
+        //     .strokeWidth(2)
+        // })
         
         // 数据点显示
         Row() {
           ForEach(this.weekData, (item: StatisticsData, index: number) => {
             Column() {
-              // 数据点容器，控制垂直位置
-              Stack() {
-                Circle()
-                  .width(12)
-                  .height(12)
-                  .fill('#FF6B6B')
-              }
-              .height(180 - item.focusTime)
-              .alignContent(Alignment.End)
+              // 数据点直接显示，不使用垂直位置控制
+              Circle()
+                .width(12)
+                .height(12)
+                .fill('#FF6B6B')
+                .margin({ bottom: item.focusTime })
               
               // 数据标签
               Text(`${item.focusTime}分钟`)
@@ -295,6 +293,7 @@ struct Statistics {
             .width('14%')
             .height(180)
             .alignItems(HorizontalAlign.Center)
+            .justifyContent(FlexAlign.End)
           })
         }
         .width('100%')
