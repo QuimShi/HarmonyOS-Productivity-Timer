@@ -35,6 +35,11 @@ struct Statistics {
   async aboutToAppear(): Promise<void> {
     await this.loadStatisticsData();
   }
+  
+  // 每次页面显示时重新加载数据
+  async onPageShow(): Promise<void> {
+    await this.loadStatisticsData();
+  }
 
   /**
    * 加载统计数据
@@ -321,15 +326,7 @@ struct Statistics {
       
       Scroll() {
         Column() {
-          // 统计卡片区域
-          Row() {
-          this.StatCard('总番茄数', this.totalPomodoros, '🍅')
-          this.StatCard('总专注时间', this.formatFocusTimeDisplay(this.totalFocusSeconds), '⏱️')
-            this.StatCard('任务总数', this.totalTasks, '📋')
-          }
-          .width('100%')
-          .justifyContent(FlexAlign.SpaceAround)
-          .margin({ top: 16 })
+          // 统计卡片区域已移除
           
           // 柱状图
           this.BarChart()
